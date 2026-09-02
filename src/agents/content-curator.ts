@@ -1,6 +1,6 @@
 /**
  * Content Curator Agent Script
- * Generates technical career transition guides for https://cerulean-marshmallow-003d16.netlify.app/
+ * Generates and publishes technical career transition guides to https://cerulean-marshmallow-003d16.netlify.app/
  */
 
 export interface ForumAnchorGuide {
@@ -11,7 +11,9 @@ export interface ForumAnchorGuide {
 }
 
 export class ContentCuratorAgent {
-  private forumUrl = 'https://cerulean-marshmallow-003d16.netlify.app/';
+  private forumUrl = process.env.TARGET_APP_URL || 'https://cerulean-marshmallow-003d16.netlify.app/';
+  private postApiUrl = process.env.FORUM_POST_API_URL || `${this.forumUrl}api/posts`;
+  private apiKey = process.env.FORUM_API_KEY || '';
 
   public generateAnchorGuide(topic: string): ForumAnchorGuide {
     console.log(`[ContentCurator] Generating technical guide for topic: "${topic}"...`);
@@ -55,14 +57,51 @@ If you are currently building web applications using React, Node.js, Python, or 
       ],
     };
   }
+
+  public async publishGuideToForum(guide: ForumAnchorGuide): Promise<boolean> {
+    console.log(`[ContentCurator] Attempting live publish to forum API: ${this.postApiUrl}...`);
+
+    if (!this.apiKey && !process.env.FORUM_POST_API_URL) {
+      console.log(`[ContentCurator] [SIMULATION MODE] No FORUM_POST_API_URL or FORUM_API_KEY set.`);
+      console.log(`[ContentCurator] To publish directly to ${this.forumUrl}, add FORUM_POST_API_URL & FORUM_API_KEY in GitHub Actions Secrets.`);
+      return false;
+    }
+
+    try {
+      const response = await fetch(this.postApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify({
+          title: guide.title,
+          category: guide.category,
+          content: guide.contentMarkdown,
+          author: 'Antigravity AI Curator',
+          createdAt: new Date().toISOString(),
+        }),
+      });
+
+      if (response.ok) {
+        console.log(`[ContentCurator] ✅ Successfully published "${guide.title}" to live forum!`);
+        return true;
+      } else {
+        console.error(`[ContentCurator] ❌ HTTP Error ${response.status}: ${await response.text()}`);
+        return false;
+      }
+    } catch (err) {
+      console.error(`[ContentCurator] ❌ Network error while posting to ${this.postApiUrl}:`, err);
+      return false;
+    }
+  }
 }
 
 // Runnable Execution
 if (require.main === module) {
   const agent = new ContentCuratorAgent();
   const guide = agent.generateAnchorGuide('Full-Stack to LLM Engineer');
-  console.log('[ContentCurator] Generated Guide Successfully:');
-  console.log(`Title: ${guide.title}`);
-  console.log(`Category: ${guide.category}`);
-  console.log(`Markdown Length: ${guide.contentMarkdown.length} characters`);
+  agent.publishGuideToForum(guide).then((success) => {
+    console.log(`[ContentCurator] Execution completed. Live Publish Status: ${success ? 'SUCCESS' : 'SIMULATION/PENDING_API_KEY'}`);
+  });
 }
