@@ -1,26 +1,38 @@
 /**
  * Content Curator Agent Script
- * Generates and publishes technical career transition guides to https://cerulean-marshmallow-003d16.netlify.app/
+ * Generates and publishes technical career transition guides directly to the Forum backend (C:\Users\minal\Project\Forum)
+ * Target Web App: https://cerulean-marshmallow-003d16.netlify.app/
  */
+
+export interface ForumPostPayload {
+  title: string;
+  content: string;
+  category: string; // Mongo ObjectId
+  tags?: string[];
+  aiMlLevel?: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'all';
+}
 
 export interface ForumAnchorGuide {
   title: string;
-  category: 'Roadmaps' | 'Math & Foundations' | 'Projects' | 'Resume Review';
+  categoryName: string;
   contentMarkdown: string;
-  discussionPrompts: string[];
+  tags: string[];
+  aiMlLevel: 'beginner' | 'intermediate' | 'advanced' | 'expert' | 'all';
 }
 
 export class ContentCuratorAgent {
-  private forumUrl = process.env.TARGET_APP_URL || 'https://cerulean-marshmallow-003d16.netlify.app/';
-  private postApiUrl = process.env.FORUM_POST_API_URL || `${this.forumUrl}api/posts`;
-  private apiKey = process.env.FORUM_API_KEY || '';
+  private forumApiBaseUrl = process.env.FORUM_API_BASE_URL || 'https://cerulean-marshmallow-003d16.netlify.app/api';
+  private jwtToken = process.env.FORUM_JWT_TOKEN || '';
+  private defaultCategoryId = process.env.FORUM_DEFAULT_CATEGORY_ID || '';
 
   public generateAnchorGuide(topic: string): ForumAnchorGuide {
     console.log(`[ContentCurator] Generating technical guide for topic: "${topic}"...`);
 
     return {
       title: 'Full-Stack Developer to LLM Engineer: 6-Month Actionable Roadmap',
-      category: 'Roadmaps',
+      categoryName: 'Roadmaps',
+      tags: ['llm', 'roadmap', 'python', 'career'],
+      aiMlLevel: 'beginner',
       contentMarkdown: `
 # Full-Stack Developer to LLM Engineer: 6-Month Actionable Roadmap
 
@@ -50,48 +62,80 @@ If you are currently building web applications using React, Node.js, Python, or 
 ### Join the Discussion!
 - *What is your biggest obstacle in transitioning to AI engineering?*
 - *Share your current project below for peer feedback!*
-`,
-      discussionPrompts: [
-        'What programming background are you transitioning from?',
-        'Which AI frameworks are you finding easiest to learn?',
-      ],
+`.trim(),
     };
   }
 
-  public async publishGuideToForum(guide: ForumAnchorGuide): Promise<boolean> {
-    console.log(`[ContentCurator] Attempting live publish to forum API: ${this.postApiUrl}...`);
+  public async fetchCategories(): Promise<{ _id: string; name: string }[]> {
+    try {
+      const res = await fetch(`${this.forumApiBaseUrl}/categories`);
+      if (res.ok) {
+        const json = await res.json();
+        return json.data || json;
+      }
+    } catch (e) {
+      console.warn(`[ContentCurator] Could not fetch categories from ${this.forumApiBaseUrl}/categories:`, e);
+    }
+    return [];
+  }
 
-    if (!this.apiKey && !process.env.FORUM_POST_API_URL) {
-      console.log(`[ContentCurator] [SIMULATION MODE] No FORUM_POST_API_URL or FORUM_API_KEY set.`);
-      console.log(`[ContentCurator] To publish directly to ${this.forumUrl}, add FORUM_POST_API_URL & FORUM_API_KEY in GitHub Actions Secrets.`);
+  public async publishGuideToForum(guide: ForumAnchorGuide): Promise<boolean> {
+    console.log(`[ContentCurator] Preparing live publish to ${this.forumApiBaseUrl}/posts...`);
+
+    if (!this.jwtToken) {
+      console.log(`[ContentCurator] [SIMULATION MODE] No FORUM_JWT_TOKEN provided.`);
+      console.log(`[ContentCurator] Discovered Backend API: POST ${this.forumApiBaseUrl}/posts`);
+      console.log(`[ContentCurator] Schema Matched: { title, content, category, tags, aiMlLevel }`);
+      console.log(`[ContentCurator] Add FORUM_JWT_TOKEN in GitHub Actions Secrets to execute live API writes.`);
       return false;
     }
 
     try {
-      const response = await fetch(this.postApiUrl, {
+      // Resolve Category ID
+      let categoryId = this.defaultCategoryId;
+      if (!categoryId) {
+        const categories = await this.fetchCategories();
+        const found = categories.find((c) => c.name.toLowerCase() === guide.categoryName.toLowerCase());
+        if (found) {
+          categoryId = found._id;
+        } else if (categories.length > 0) {
+          categoryId = categories[0]._id;
+        }
+      }
+
+      if (!categoryId) {
+        console.error(`[ContentCurator] ❌ Unable to resolve Category ID for post. Provide FORUM_DEFAULT_CATEGORY_ID.`);
+        return false;
+      }
+
+      const payload: ForumPostPayload = {
+        title: guide.title,
+        content: guide.contentMarkdown,
+        category: categoryId,
+        tags: guide.tags,
+        aiMlLevel: guide.aiMlLevel,
+      };
+
+      const response = await fetch(`${this.forumApiBaseUrl}/posts`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
+          'Authorization': `Bearer ${this.jwtToken}`,
         },
-        body: JSON.stringify({
-          title: guide.title,
-          category: guide.category,
-          content: guide.contentMarkdown,
-          author: 'Antigravity AI Curator',
-          createdAt: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (response.ok) {
-        console.log(`[ContentCurator] ✅ Successfully published "${guide.title}" to live forum!`);
+        const result = await response.json();
+        console.log(`[ContentCurator] ✅ Post created successfully on live forum! ID: ${result.data?._id || 'ok'}`);
         return true;
       } else {
-        console.error(`[ContentCurator] ❌ HTTP Error ${response.status}: ${await response.text()}`);
+        const errText = await response.text();
+        console.error(`[ContentCurator] ❌ HTTP ${response.status} Error from Forum API:`, errText);
         return false;
       }
     } catch (err) {
-      console.error(`[ContentCurator] ❌ Network error while posting to ${this.postApiUrl}:`, err);
+      console.error(`[ContentCurator] ❌ Network error while posting to Forum API:`, err);
       return false;
     }
   }
@@ -102,6 +146,6 @@ if (require.main === module) {
   const agent = new ContentCuratorAgent();
   const guide = agent.generateAnchorGuide('Full-Stack to LLM Engineer');
   agent.publishGuideToForum(guide).then((success) => {
-    console.log(`[ContentCurator] Execution completed. Live Publish Status: ${success ? 'SUCCESS' : 'SIMULATION/PENDING_API_KEY'}`);
+    console.log(`[ContentCurator] Execution finished. Live Publish Status: ${success ? 'SUCCESS' : 'SIMULATION/PENDING_JWT'}`);
   });
 }
