@@ -1,0 +1,592 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI/ML Skill Gap Analyzer | Career Transition Diagnostic</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-gradient: linear-gradient(135deg, #0b0f19 0%, #111827 50%, #0f172a 100%);
+      --card-bg: rgba(30, 41, 59, 0.7);
+      --card-border: rgba(255, 255, 255, 0.1);
+      --primary: #6366f1;
+      --primary-hover: #4f46e5;
+      --accent-cyan: #06b6d4;
+      --accent-emerald: #10b981;
+      --accent-purple: #8b5cf6;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg-gradient);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .analyzer-card {
+      background: var(--card-bg);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid var(--card-border);
+      border-radius: 24px;
+      width: 100%;
+      max-width: 820px;
+      padding: 40px;
+      box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5), 0 0 40px rgba(99, 102, 241, 0.15);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .analyzer-card::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 250px;
+      height: 250px;
+      background: radial-gradient(circle, rgba(99, 102, 241, 0.2) 0%, rgba(0, 0, 0, 0) 70%);
+      pointer-events: none;
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: 32px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: rgba(99, 102, 241, 0.15);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      color: #a5b4fc;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 999px;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .title {
+      font-size: 2rem;
+      font-weight: 800;
+      background: linear-gradient(to right, #ffffff, #c7d2fe, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+    }
+
+    /* Step Indicator */
+    .steps-bar {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 32px;
+      position: relative;
+    }
+
+    .steps-bar::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.1);
+      z-index: 1;
+      transform: translateY(-50%);
+    }
+
+    .step-item {
+      position: relative;
+      z-index: 2;
+      background: #0f172a;
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      transition: all 0.3s ease;
+    }
+
+    .step-item.active {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: #fff;
+      box-shadow: 0 0 15px rgba(99, 102, 241, 0.6);
+    }
+
+    .step-item.completed {
+      border-color: var(--accent-emerald);
+      background: var(--accent-emerald);
+      color: #fff;
+    }
+
+    /* Form Panels */
+    .step-panel {
+      display: none;
+      animation: fadeIn 0.4s ease forwards;
+    }
+
+    .step-panel.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .section-title {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin-bottom: 16px;
+      color: #e2e8f0;
+    }
+
+    .grid-options {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+
+    .option-card {
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      padding: 16px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .option-card:hover {
+      border-color: rgba(99, 102, 241, 0.5);
+      background: rgba(99, 102, 241, 0.1);
+      transform: translateY(-2px);
+    }
+
+    .option-card.selected {
+      border-color: var(--primary);
+      background: rgba(99, 102, 241, 0.2);
+      box-shadow: 0 0 12px rgba(99, 102, 241, 0.3);
+    }
+
+    .option-card input[type="radio"],
+    .option-card input[type="checkbox"] {
+      accent-color: var(--primary);
+      width: 18px;
+      height: 18px;
+    }
+
+    .option-info label {
+      font-weight: 600;
+      font-size: 0.95rem;
+      color: #f1f5f9;
+      cursor: pointer;
+      display: block;
+    }
+
+    .option-info span {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 2px;
+    }
+
+    /* Buttons */
+    .button-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 24px;
+    }
+
+    .btn {
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      border: none;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cbd5e1;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+    }
+
+    .btn-primary:hover {
+      box-shadow: 0 6px 20px rgba(99, 102, 241, 0.6);
+      transform: translateY(-1px);
+    }
+
+    .btn-cta {
+      background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+      color: #fff;
+      font-size: 1rem;
+      padding: 14px 28px;
+      box-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+      width: 100%;
+      justify-content: center;
+      margin-top: 20px;
+      text-decoration: none;
+    }
+
+    .btn-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 25px rgba(16, 185, 129, 0.6);
+    }
+
+    /* Results Dashboard */
+    .results-container {
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 18px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 24px;
+    }
+
+    .score-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(135deg, rgba(99, 102, 241, 0.15) 0%, rgba(139, 92, 246, 0.15) 100%);
+      border: 1px solid rgba(99, 102, 241, 0.3);
+      padding: 20px;
+      border-radius: 14px;
+      margin-bottom: 24px;
+    }
+
+    .score-circle {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      background: radial-gradient(circle, #6366f1 0%, #4f46e5 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+    }
+
+    .gap-bar-group {
+      margin-bottom: 16px;
+    }
+
+    .gap-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+
+    .bar-bg {
+      height: 10px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(to right, var(--primary), var(--accent-cyan));
+      border-radius: 999px;
+      transition: width 1s ease;
+    }
+
+    .recommendations-list {
+      list-style: none;
+      margin-top: 20px;
+    }
+
+    .rec-item {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      padding: 14px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .rec-icon {
+      color: var(--accent-emerald);
+      font-weight: 700;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="analyzer-card">
+    <div class="header">
+      <div class="badge">✦ Free AI Career Diagnostic</div>
+      <h1 class="title">AI/ML Skill Gap Analyzer</h1>
+      <p class="subtitle">Evaluate your readiness to transition into high-demand AI & ML Engineering roles.</p>
+    </div>
+
+    <!-- Step Progress -->
+    <div class="steps-bar">
+      <div class="step-item active" id="step-dot-1">1</div>
+      <div class="step-item" id="step-dot-2">2</div>
+      <div class="step-item" id="step-dot-3">3</div>
+      <div class="step-item" id="step-dot-4">✓</div>
+    </div>
+
+    <!-- Step 1: Background -->
+    <div class="step-panel active" id="panel-1">
+      <div class="section-title">Step 1: What is your current engineering background?</div>
+      <div class="grid-options">
+        <div class="option-card" onclick="selectRadio('bg', 'fullstack', this)">
+          <input type="radio" name="bg" value="fullstack" checked />
+          <div class="option-info">
+            <label>Full-Stack / Web Dev</label>
+            <span>React, Node, Python, TS</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('bg', 'backend', this)">
+          <input type="radio" name="bg" value="backend" />
+          <div class="option-info">
+            <label>Backend / Systems</label>
+            <span>Java, Go, C++, Microservices</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('bg', 'data', this)">
+          <input type="radio" name="bg" value="data" />
+          <div class="option-info">
+            <label>Data Analyst / SQL</label>
+            <span>Pandas, BI, SQL, R</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('bg', 'devops', this)">
+          <input type="radio" name="bg" value="devops" />
+          <div class="option-info">
+            <label>DevOps / Cloud</label>
+            <span>Docker, K8s, AWS, Terraform</span>
+          </div>
+        </div>
+      </div>
+      <div class="button-row">
+        <div></div>
+        <button class="btn btn-primary" onclick="nextStep(2)">Next: Select Target Role →</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Target Role -->
+    <div class="step-panel" id="panel-2">
+      <div class="section-title">Step 2: Which AI/ML role are you aiming for?</div>
+      <div class="grid-options">
+        <div class="option-card" onclick="selectRadio('role', 'llm_eng', this)">
+          <input type="radio" name="role" value="llm_eng" checked />
+          <div class="option-info">
+            <label>LLM Application Engineer</label>
+            <span>RAG, Vector DBs, Fine-tuning, Agents</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('role', 'mlops', this)">
+          <input type="radio" name="role" value="mlops" />
+          <div class="option-info">
+            <label>MLOps Engineer</label>
+            <span>Model Deployment, Pipelines, Monitoring</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('role', 'ml_eng', this)">
+          <input type="radio" name="role" value="ml_eng" />
+          <div class="option-info">
+            <label>ML Core Engineer</label>
+            <span>PyTorch, Model Training, Algorithms</span>
+          </div>
+        </div>
+        <div class="option-card" onclick="selectRadio('role', 'ai_pm', this)">
+          <input type="radio" name="role" value="ai_pm" />
+          <div class="option-info">
+            <label>AI Product Specialist</label>
+            <span>Prompt Architecture, AI Strategy</span>
+          </div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-secondary" onclick="nextStep(1)">← Back</button>
+        <button class="btn btn-primary" onclick="nextStep(3)">Next: Check Current Skills →</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Current Skills -->
+    <div class="step-panel" id="panel-3">
+      <div class="section-title">Step 3: Select skills you currently possess (Select all that apply)</div>
+      <div class="grid-options">
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="python" checked />
+          <div class="option-info"><label>Python Proficiency</label><span>Syntax, Async, Packages</span></div>
+        </div>
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="math" />
+          <div class="option-info"><label>Linear Algebra & Calculus</label><span>Vectors, Matrices, Gradients</span></div>
+        </div>
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="pytorch" />
+          <div class="option-info"><label>PyTorch / TensorFlow</label><span>Tensors, Neural Nets</span></div>
+        </div>
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="rag" />
+          <div class="option-info"><label>RAG & Vector DBs</label><span>Pinecone, Chroma, Embeddings</span></div>
+        </div>
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="docker" checked />
+          <div class="option-info"><label>Docker & Containers</label><span>Deployment & Microservices</span></div>
+        </div>
+        <div class="option-card" onclick="toggleCheckbox(this)">
+          <input type="checkbox" value="finetune" />
+          <div class="option-info"><label>Model Fine-tuning (LoRA)</label><span>HuggingFace, PEFT</span></div>
+        </div>
+      </div>
+      <div class="button-row">
+        <button class="btn btn-secondary" onclick="nextStep(2)">← Back</button>
+        <button class="btn btn-primary" onclick="calculateResults()">Generate My Skill Gap Breakdown ✦</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Results Dashboard -->
+    <div class="step-panel" id="panel-4">
+      <div class="results-container">
+        <div class="score-banner">
+          <div>
+            <h3 style="font-size: 1.3rem; margin-bottom: 4px;" id="res-title">Role Match Score</h3>
+            <p style="color: #94a3b8; font-size: 0.9rem;" id="res-desc">Based on target role requirements and your engineering background.</p>
+          </div>
+          <div class="score-circle" id="score-val">74%</div>
+        </div>
+
+        <div class="section-title">Skill Dimension Breakdown:</div>
+        
+        <div class="gap-bar-group">
+          <div class="gap-label-row"><span>Python & Software Fundamentals</span><span id="bar-1-val">90%</span></div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-1" style="width: 90%;"></div></div>
+        </div>
+        
+        <div class="gap-bar-group">
+          <div class="gap-label-row"><span>AI Frameworks & Vector DBs</span><span id="bar-2-val">55%</span></div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-2" style="width: 55%;"></div></div>
+        </div>
+
+        <div class="gap-bar-group">
+          <div class="gap-label-row"><span>Math & Neural Network Foundations</span><span id="bar-3-val">40%</span></div>
+          <div class="bar-bg"><div class="bar-fill" id="bar-3" style="width: 40%;"></div></div>
+        </div>
+
+        <div class="section-title" style="margin-top: 24px;">Recommended Next Steps:</div>
+        <ul class="recommendations-list">
+          <li class="rec-item">
+            <span class="rec-icon">✓</span>
+            <div><strong>Recommended Thread:</strong> "Full-Stack Developer to LLM Engineer: Step-by-Step 6-Month Roadmap"</div>
+          </li>
+          <li class="rec-item">
+            <span class="rec-icon">✓</span>
+            <div><strong>Project to Build:</strong> RAG-based documentation search engine using Python & Vector Search.</div>
+          </li>
+        </ul>
+
+        <a href="https://cerulean-marshmallow-003d16.netlify.app/" target="_blank" class="btn btn-cta">
+          🚀 Join the Forum & Get Your Personal Resume Review on Netlify →
+        </a>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let currentStep = 1;
+
+    function nextStep(step) {
+      document.querySelectorAll('.step-panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.step-item').forEach((dot, idx) => {
+        dot.classList.remove('active');
+        if (idx + 1 < step) dot.classList.add('completed');
+        if (idx + 1 === step) dot.classList.add('active');
+      });
+      document.getElementById(`panel-${step}`).classList.add('active');
+      currentStep = step;
+    }
+
+    function selectRadio(name, val, el) {
+      document.querySelectorAll(`input[name="${name}"]`).forEach(inp => {
+        inp.checked = false;
+        inp.closest('.option-card').classList.remove('selected');
+      });
+      const input = el.querySelector('input');
+      input.checked = true;
+      el.classList.add('selected');
+    }
+
+    function toggleCheckbox(el) {
+      const input = el.querySelector('input');
+      input.checked = !input.checked;
+      el.classList.toggle('selected', input.checked);
+    }
+
+    function calculateResults() {
+      // Calculate score based on selections
+      const checkedSkills = document.querySelectorAll('#panel-3 input[type="checkbox"]:checked').length;
+      const baseScore = 40 + (checkedSkills * 10);
+      const finalScore = Math.min(baseScore, 92);
+
+      document.getElementById('score-val').innerText = `${finalScore}%`;
+      document.getElementById('bar-1').style.width = `${Math.min(finalScore + 10, 95)}%`;
+      document.getElementById('bar-1-val').innerText = `${Math.min(finalScore + 10, 95)}%`;
+      document.getElementById('bar-2').style.width = `${checkedSkills * 15}%`;
+      document.getElementById('bar-2-val').innerText = `${checkedSkills * 15}%`;
+      document.getElementById('bar-3').style.width = `${Math.max(30, checkedSkills * 10)}%`;
+      document.getElementById('bar-3-val').innerText = `${Math.max(30, checkedSkills * 10)}%`;
+
+      nextStep(4);
+    }
+  </script>
+</body>
+</html>

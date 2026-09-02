@@ -1,0 +1,21 @@
+{
+  "name": "aiml-forum-growth-system",
+  "version": "1.0.0",
+  "description": "Antigravity Agent Growth & Promotion System for AI/ML Career Transition Forum (cerulean-marshmallow-003d16.netlify.app)",
+  "main": "src/agents/growth-orchestrator.ts",
+  "scripts": {
+    "start": "tsx src/agents/growth-orchestrator.ts",
+    "curate": "tsx src/agents/content-curator.ts",
+    "outreach": "tsx src/agents/outreach-scout.ts",
+    "nurture": "tsx src/agents/community-nurture.ts",
+    "worker": "tsx src/cloud-worker.ts"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.17.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}
