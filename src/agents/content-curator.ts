@@ -1,7 +1,6 @@
 /**
  * Content Curator Agent Script
- * Generates and publishes technical career transition guides directly to the Forum backend (C:\Users\minal\Project\Forum)
- * Target Web App: https://cerulean-marshmallow-003d16.netlify.app/
+ * Automatically logs in/registers as an agent user and publishes technical guides to https://cerulean-marshmallow-003d16.netlify.app/
  */
 
 export interface ForumPostPayload {
@@ -22,6 +21,8 @@ export interface ForumAnchorGuide {
 
 export class ContentCuratorAgent {
   private forumApiBaseUrl = process.env.FORUM_API_BASE_URL || 'https://cerulean-marshmallow-003d16.netlify.app/api';
+  private agentEmail = process.env.FORUM_AGENT_EMAIL || 'antigravity-agent@forum.com';
+  private agentPassword = process.env.FORUM_AGENT_PASSWORD || 'AgentPass123!';
   private jwtToken = process.env.FORUM_JWT_TOKEN || '';
   private defaultCategoryId = process.env.FORUM_DEFAULT_CATEGORY_ID || '';
 
@@ -66,6 +67,62 @@ If you are currently building web applications using React, Node.js, Python, or 
     };
   }
 
+  /**
+   * Authenticates the agent with the Forum backend via /api/users/login or /api/users/register
+   */
+  public async authenticateAgent(): Promise<string> {
+    if (this.jwtToken) return this.jwtToken;
+
+    console.log(`[ContentCurator] Attempting automated agent login as (${this.agentEmail})...`);
+
+    try {
+      // 1. Try Login
+      const loginRes = await fetch(`${this.forumApiBaseUrl}/users/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: this.agentEmail, password: this.agentPassword }),
+      });
+
+      if (loginRes.ok) {
+        const data = await loginRes.json();
+        const token = data.token || (loginRes.headers.get('set-cookie') ? 'cookie-authenticated' : '');
+        if (token) {
+          console.log(`[ContentCurator] ✅ Agent logged in successfully.`);
+          this.jwtToken = token;
+          return token;
+        }
+      }
+
+      // 2. If Login fails, try registering the Agent account automatically
+      console.log(`[ContentCurator] Account not found. Registering new agent user...`);
+      const regRes = await fetch(`${this.forumApiBaseUrl}/users/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: 'Antigravity AI Curator',
+          email: this.agentEmail,
+          password: this.agentPassword,
+          role: 'user',
+        }),
+      });
+
+      if (regRes.ok) {
+        const data = await regRes.json();
+        if (data.token) {
+          console.log(`[ContentCurator] ✅ Agent user registered & authenticated.`);
+          this.jwtToken = data.token;
+          return data.token;
+        }
+      } else {
+        console.warn(`[ContentCurator] Registration status: ${regRes.status}`);
+      }
+    } catch (err) {
+      console.warn(`[ContentCurator] Auth warning:`, err);
+    }
+
+    return '';
+  }
+
   public async fetchCategories(): Promise<{ _id: string; name: string }[]> {
     try {
       const res = await fetch(`${this.forumApiBaseUrl}/categories`);
@@ -82,11 +139,11 @@ If you are currently building web applications using React, Node.js, Python, or 
   public async publishGuideToForum(guide: ForumAnchorGuide): Promise<boolean> {
     console.log(`[ContentCurator] Preparing live publish to ${this.forumApiBaseUrl}/posts...`);
 
-    if (!this.jwtToken) {
-      console.log(`[ContentCurator] [SIMULATION MODE] No FORUM_JWT_TOKEN provided.`);
-      console.log(`[ContentCurator] Discovered Backend API: POST ${this.forumApiBaseUrl}/posts`);
-      console.log(`[ContentCurator] Schema Matched: { title, content, category, tags, aiMlLevel }`);
-      console.log(`[ContentCurator] Add FORUM_JWT_TOKEN in GitHub Actions Secrets to execute live API writes.`);
+    const token = await this.authenticateAgent();
+
+    if (!token) {
+      console.log(`[ContentCurator] [SIMULATION MODE] Agent could not authenticate to live endpoint ${this.forumApiBaseUrl}`);
+      console.log(`[ContentCurator] Ensure your forum server at ${this.forumApiBaseUrl} is running and reachable.`);
       return false;
     }
 
@@ -104,7 +161,7 @@ If you are currently building web applications using React, Node.js, Python, or 
       }
 
       if (!categoryId) {
-        console.error(`[ContentCurator] ❌ Unable to resolve Category ID for post. Provide FORUM_DEFAULT_CATEGORY_ID.`);
+        console.error(`[ContentCurator] ❌ Unable to resolve Category ID. Provide FORUM_DEFAULT_CATEGORY_ID.`);
         return false;
       }
 
@@ -116,18 +173,22 @@ If you are currently building web applications using React, Node.js, Python, or 
         aiMlLevel: guide.aiMlLevel,
       };
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (token !== 'cookie-authenticated') {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch(`${this.forumApiBaseUrl}/posts`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.jwtToken}`,
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
       if (response.ok) {
         const result = await response.json();
-        console.log(`[ContentCurator] ✅ Post created successfully on live forum! ID: ${result.data?._id || 'ok'}`);
+        console.log(`[ContentCurator] 🎉 SUCCESS! Post published to live forum! ID: ${result.data?._id || 'ok'}`);
         return true;
       } else {
         const errText = await response.text();
@@ -146,6 +207,6 @@ if (require.main === module) {
   const agent = new ContentCuratorAgent();
   const guide = agent.generateAnchorGuide('Full-Stack to LLM Engineer');
   agent.publishGuideToForum(guide).then((success) => {
-    console.log(`[ContentCurator] Execution finished. Live Publish Status: ${success ? 'SUCCESS' : 'SIMULATION/PENDING_JWT'}`);
+    console.log(`[ContentCurator] Execution finished. Live Publish Status: ${success ? 'SUCCESS' : 'SIMULATION/UNAUTHENTICATED'}`);
   });
 }
